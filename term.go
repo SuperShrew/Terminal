@@ -136,6 +136,7 @@ func excecute(command string) int {
 		for _, file := range files {
 			fmt.Println(file.Name())
 		}
+    return 1
 	} else if cmd[0] == "touch" {
 
 		file, err := os.Create(cmd[1])
