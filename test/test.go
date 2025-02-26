@@ -8,73 +8,106 @@ import (
 )
 
 func readEditableInput(preFilled, lastString string) string {
-	fd := int(os.Stdin.Fd())
-	var oldState syscall.Termios
-	syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), syscall.TCGETS, uintptr(unsafe.Pointer(&oldState)))
-	newState := oldState
-	newState.Lflag &^= syscall.ICANON | syscall.ECHO
-	syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), syscall.TCSETS, uintptr(unsafe.Pointer(&newState)))
-	defer syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), syscall.TCSETS, uintptr(unsafe.Pointer(&oldState)))
+    // Get the file descriptor for standard input (fd 0)
+    fd := int(os.Stdin.Fd())
 
-	fmt.Print("\r> " + preFilled)
-	input := []rune(preFilled)
-	cursorPos := len(input)
+    // Save the current terminal settings
+    var oldState syscall.Termios
+    syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), syscall.TCGETS, uintptr(unsafe.Pointer(&oldState)))
 
-	for {
-		var buf [1]byte
-		os.Stdin.Read(buf[:])
-		key := buf[0]
+    // Create a copy of the terminal settings to modify
+    newState := oldState
 
-		if key == '\n' {
-			break
-		}
+    // Disable canonical mode (for raw input processing) and echoing of input
+    newState.Lflag &^= syscall.ICANON | syscall.ECHO
 
-		if key == 8 || key == 127 {
-			if cursorPos > 0 {
-				input = append(input[:cursorPos-1], input[cursorPos:]...)
-				cursorPos--
-				fmt.Print("\r> " + string(input) + " \b")
-				fmt.Print("\r> " + string(input[:cursorPos]))
-			}
-			continue
-		}
+    // Set the new terminal settings
+    syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), syscall.TCSETS, uintptr(unsafe.Pointer(&newState)))
 
-		if key == 27 {
-			var seq [2]byte
-			os.Stdin.Read(seq[:])
-			if seq[0] == '[' {
-				if seq[1] == 'D' && cursorPos > 0 {
-					cursorPos--
-					fmt.Print("\b")
-				}
-				if seq[1] == 'C' && cursorPos < len(input) {
-					fmt.Print(string(input[cursorPos]))
-					cursorPos++
-				}
-				if seq[1] == 'A' { // Up arrow pressed
-					input = []rune(lastString)
-					cursorPos = len(input)
-					fmt.Print("\r> " + string(input) + "  ")
-					fmt.Print("\r> " + string(input))
-				}
-			}
-			continue
-		}
+    // Ensure the terminal state is reset to the original state when the function exits
+    defer syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), syscall.TCSETS, uintptr(unsafe.Pointer(&oldState)))
 
-		if cursorPos == len(input) {
-			input = append(input, rune(key))
-		} else {
-			input = append(input[:cursorPos], append([]rune{rune(key)}, input[cursorPos:]...)...)
-		}
+    // Print the prompt with the pre-filled text
+    fmt.Print("\r> " + preFilled)
+    
+    // Convert the pre-filled string into a slice of runes (to handle multi-byte characters)
+    input := []rune(preFilled)
 
-		cursorPos++
-		fmt.Print("\r> " + string(input) + " ")
-		fmt.Print("\r> " + string(input[:cursorPos]))
-	}
+    // Set the initial cursor position to the end of the pre-filled input
+    cursorPos := len(input)
 
-	fmt.Println()
-	return string(input)
+    for {
+        var buf [1]byte
+        // Read one byte from stdin
+        os.Stdin.Read(buf[:])
+        key := buf[0]
+
+        // If Enter (newline) is pressed, break the loop and return the input
+        if key == '\n' {
+            break
+        }
+
+        // Handle backspace (8 or 127 are ASCII codes for backspace)
+        if key == 8 || key == 127 {
+            if cursorPos > 0 {
+                // Remove the character before the cursor
+                input = append(input[:cursorPos-1], input[cursorPos:]...)
+                cursorPos--
+                // Print the updated input and move the cursor back one step
+                fmt.Print("\r> " + string(input) + " \b")
+                fmt.Print("\r> " + string(input[:cursorPos]))
+            }
+            continue
+        }
+
+        // Handle special key sequences, e.g., arrow keys
+        if key == 27 {
+            var seq [2]byte
+            // Read the escape sequence (two more bytes)
+            os.Stdin.Read(seq[:])
+            if seq[0] == '[' {
+                // Left arrow (move cursor left)
+                if seq[1] == 'D' && cursorPos > 0 {
+                    cursorPos--
+                    fmt.Print("\b")
+                }
+                // Right arrow (move cursor right)
+                if seq[1] == 'C' && cursorPos < len(input) {
+                    fmt.Print(string(input[cursorPos]))
+                    cursorPos++
+                }
+                // Up arrow (replace input with the last string)
+                if seq[1] == 'A' {
+                    input = []rune(lastString)
+                    cursorPos = len(input)
+                    // Display the last input string
+                    fmt.Print("\r> " + string(input) + "  ")
+                    fmt.Print("\r> " + string(input))
+                }
+            }
+            continue
+        }
+
+        // Insert the character at the current cursor position
+        if cursorPos == len(input) {
+            input = append(input, rune(key))
+        } else {
+            input = append(input[:cursorPos], append([]rune{rune(key)}, input[cursorPos:]...)...)
+        }
+
+        cursorPos++
+        // Print the updated input and reset the cursor position to the current position
+        fmt.Print("\r> " + string(input) + " ")
+        fmt.Print("\r> " + string(input[:cursorPos]))
+    }
+
+    // After exiting the loop, print a newline for clean output
+    fmt.Println()
+    
+    // Return the final string that was entered
+    return string(input)
 }
+
 
 func main() {
 	lastCommand := "echo Hello, World!"
