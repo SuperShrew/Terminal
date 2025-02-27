@@ -20,13 +20,14 @@ func main() {
 		return
 	}
 	cmd := strings.Split(os.Args[1], " ")
-	filepath.Walk("/termfiles/packages", func(path string, info os.FileInfo, err error) error {
+	filepath.Walk("./termfiles/packages", func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			fmt.Println(err)
 			return err
 		}
 		fmt.Println(info.Name())
 		if info.Name() == cmd[0] + ".go" {
+			fmt.Println("OMGOMGOMG")
 			output, err := exec.Command("go", "run", path, cmd[1]).CombinedOutput()
 			if err != nil {
 				fmt.Println("Error:", err)
