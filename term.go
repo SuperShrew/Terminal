@@ -175,7 +175,7 @@ func main() {
 		command = Edput("", lastCommand, currentUser.Username)
 		code = excecute(command)
     if code == 0 {
-      output, err := exec.Command("go", "run", "termfiles/.packages/executep.go", command).CombinedOutput()
+      output, err := exec.Command("go", "run", "termfiles/packages/executep.go", command).CombinedOutput()
       if err != nil {
         fmt.Println("Error:", err)
       }

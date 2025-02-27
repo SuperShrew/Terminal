@@ -6,6 +6,7 @@ import (
 	"syscall"
 	"unsafe"
     "strings"
+	"io/ioutil"
 )
 
 func Edit(preFilled string) string {
@@ -111,5 +112,9 @@ func min(a, b int) int {
 }
 
 func main() {
-	//Edit(os.Args[1])
+	data, err := ioutil.ReadFile(os.Args[1])
+	if err != nil {
+		fmt.Println(err)
+	}
+	Edit(string(data))
 }
